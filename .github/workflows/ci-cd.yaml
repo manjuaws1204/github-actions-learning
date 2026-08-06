@@ -1,0 +1,85 @@
+name: CI/CD - order-service
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: order-service
+  NAMESPACE: github-actions
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 1. TEST - runs on a normal GitHub-hosted runner, no cluster needed.
+  # ---------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: pytest -v
+
+  # ---------------------------------------------------------------------
+  # 2. BUILD - must run on a SELF-HOSTED runner sitting on the same
+  #    machine as minikube, because it builds the image straight into
+  #    minikube's internal image store (no external registry needed
+  #    for this local learning setup).
+  #
+  #    Set up the runner once with:
+  #      ./config.sh --labels minikube
+  #    on the machine where `minikube start` was run.
+  # ---------------------------------------------------------------------
+  build:
+    needs: test
+    runs-on: [self-hosted, minikube]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image into minikube's image store
+        run: |
+          minikube image build -t ${IMAGE_NAME}:${{ github.sha }} ./app
+
+  # ---------------------------------------------------------------------
+  # 3. DEPLOY - also self-hosted, applies manifests and rolls out the
+  #    new image, then waits for the rollout to actually succeed.
+  # ---------------------------------------------------------------------
+  deploy:
+    needs: build
+    runs-on: [self-hosted, minikube]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply namespace, Prometheus and RBAC (idempotent)
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/prometheus-rbac.yaml
+          kubectl apply -f k8s/prometheus-configmap.yaml
+          kubectl apply -f k8s/prometheus-deployment.yaml
+
+      - name: Set image tag and deploy order-service
+        run: |
+          sed "s|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${{ github.sha }}|" \
+            k8s/deployment.yaml | kubectl apply -f -
+          kubectl apply -f k8s/service.yaml
+
+      - name: Wait for rollout to finish
+        run: |
+          kubectl rollout status deployment/order-service \
+            -n ${NAMESPACE} --timeout=120s
+
+      - name: Show running pods
+        if: always()
+        run: kubectl get pods -n ${NAMESPACE} -o wide
