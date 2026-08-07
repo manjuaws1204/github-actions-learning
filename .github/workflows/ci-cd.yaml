@@ -64,7 +64,7 @@ jobs:
         # step/process, since the env vars docker-env sets only last for
         # the process that set them.
         run: |
-          & minikube -p minikube docker-env --shell powershell | Invoke-Expression
+          & minikube.exe -p minikube docker-env --shell powershell | Invoke-Expression
           if ($LASTEXITCODE -ne 0) {
             Write-Error "minikube docker-env failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
