@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: github-actions
+data:
+  alert-rules.yml: |
+    groups:
+      # -----------------------------------------------------------------
+      # order-service - application-level alerts, built on the metrics
+      # instrumented directly in app.py (http_requests_total,
+      # http_request_duration_seconds, orders_created/failed_total).
+      # -----------------------------------------------------------------
+      - name: order-service.rules
+        rules:
+          - alert: OrderServiceDown
+            expr: up{app="order-service"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "order-service target down ({{ $labels.kubernetes_pod_name }})"
+              description: "Prometheus has not been able to scrape {{ $labels.kubernetes_pod_name }} for over 1 minute."
+
+          - alert: HighHttpErrorRate
+            expr: |
+              sum(rate(http_requests_total{app="order-service", status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{app="order-service"}[5m]))
+              > 0.10
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "order-service 5xx rate above 10%"
+              description: "Current 5xx error ratio is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+          - alert: HighRequestLatencyP95
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(http_request_duration_seconds_bucket{app="order-service"}[5m])) by (le)
+              ) > 0.5
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "order-service p95 latency above 500ms"
+              description: "p95 request latency is {{ $value | humanizeDuration }} (threshold: 500ms)."
+
+          - alert: HighOrderFailureRate
+            # Distinct from HighHttpErrorRate on purpose: this is a business
+            # metric (orders that failed to process) rather than a pure
+            # HTTP-layer metric, even though today they're correlated.
+            expr: |
+              sum(rate(orders_failed_total[5m]))
+              /
+              (sum(rate(orders_created_total[5m])) + sum(rate(orders_failed_total[5m])))
+              > 0.20
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Over 20% of orders are failing"
+              description: "Order failure rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      # -----------------------------------------------------------------
+      # node - host-level alerts from node-exporter (port 9101 in this
+      # setup, to avoid colliding with the existing kube-prometheus-stack
+      # node-exporter on 9100).
+      # -----------------------------------------------------------------
+      - name: node.rules
+        rules:
+          - alert: NodeExporterDown
+            expr: up{app="node-exporter"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "node-exporter target down"
+              description: "Prometheus has not been able to scrape node-exporter for over 2 minutes - host metrics are blind."
+
+          - alert: NodeHighCpuUsage
+            expr: |
+              100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node CPU usage above 80%"
+              description: "CPU usage on {{ $labels.instance }} is {{ $value | humanize }}%."
+
+          - alert: NodeLowAvailableMemory
+            expr: |
+              (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.10
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node available memory below 10%"
+              description: "Only {{ $value | humanizePercentage }} memory available on {{ $labels.instance }}."

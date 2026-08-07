@@ -91,8 +91,14 @@ jobs:
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/prometheus-rbac.yaml
           kubectl apply -f k8s/prometheus-configmap.yaml
+          kubectl apply -f k8s/prometheus-rules-configmap.yaml
           kubectl apply -f k8s/prometheus-deployment.yaml
           kubectl apply -f k8s/node-exporter-daemonset.yaml
+          
+      - name: Restart Prometheus to pick up config/rule changes
+        run: |
+          kubectl rollout restart deployment/prometheus -n ${{env.NAMESPACE}}
+          kubectl rollout status deployment/prometheus -n ${{ env.NAMESPACE }} --timeout=90s
 
       - name: Set image tag and deploy order-service
         # PowerShell's -replace instead of sed, since sed isn't available

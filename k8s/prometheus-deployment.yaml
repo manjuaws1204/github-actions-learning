@@ -27,6 +27,8 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus
+            - name: rules
+              mountPath: /etc/prometheus/rules
           resources:
             requests:
               cpu: 50m
@@ -38,6 +40,9 @@ spec:
         - name: config
           configMap:
             name: prometheus-config
+        - name: rules
+          configmap:
+            name: prometheus-rules
 ---
 apiVersion: v1
 kind: Service
