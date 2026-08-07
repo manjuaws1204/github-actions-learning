@@ -94,11 +94,16 @@ jobs:
           kubectl apply -f k8s/prometheus-rules-configmap.yaml
           kubectl apply -f k8s/prometheus-deployment.yaml
           kubectl apply -f k8s/node-exporter-daemonset.yaml
+          kubectl apply -f k8s/grafana-datasource-configmap.yaml
+          kubectl apply -f k8s/grafana-deployment.yaml
           
       - name: Restart Prometheus to pick up config/rule changes
         run: |
           kubectl rollout restart deployment/prometheus -n ${{env.NAMESPACE}}
           kubectl rollout status deployment/prometheus -n ${{ env.NAMESPACE }} --timeout=90s
+      - name: Wait for Grafana rollout
+        run: |
+          kubectl rollout status deployment/grafana -n ${{ env.NAMESPACE }} --timeout=90s
 
       - name: Set image tag and deploy order-service
         # PowerShell's -replace instead of sed, since sed isn't available

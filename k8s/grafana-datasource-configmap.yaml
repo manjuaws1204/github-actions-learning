@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: github-actions
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        # Standard Kubernetes DNS name for a Service:
+        # <service>.<namespace>.svc.cluster.local
+        url: http://prometheus.github-actions.svc.cluster.local:9091
+        isDefault: true
+        editable: true
