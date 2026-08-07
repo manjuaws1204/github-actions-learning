@@ -50,6 +50,10 @@ jobs:
         # default shell is bash or PowerShell.
         run: |
           minikube image build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} ./app
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "minikube image build failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
 
   # ---------------------------------------------------------------------
   # 3. DEPLOY - also self-hosted, applies manifests and rolls out the
@@ -73,7 +77,9 @@ jobs:
         # on Windows by default.
         run: |
           (Get-Content k8s/deployment.yaml) -replace 'IMAGE_PLACEHOLDER', '${{ env.IMAGE_NAME }}:${{ github.sha }}' | kubectl apply -f -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           kubectl apply -f k8s/service.yaml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Wait for rollout to finish
         run: |
