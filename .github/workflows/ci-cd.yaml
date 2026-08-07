@@ -44,12 +44,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build image into minikube's image store
-        # Uses ${{ }} (GitHub's own substitution, resolved before the shell
-        # runs) instead of $VAR / ${VAR} so this works whether the runner's
-        # default shell is bash or PowerShell.
+      - name: Diagnose environment
+        # Temporary diagnostic step: confirms which user/profile context
+        # the runner is actually operating under, to compare against a
+        # manual terminal session.
         run: |
-          minikube image build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} ./app
+          whoami
+          echo "USERPROFILE=$env:USERPROFILE"
+          minikube profile list
+          kubectl config current-context
+
+      - name: Build image into minikube's image store
+        run: |
+          $output = minikube image build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} ./app 2>&1
+          $output | ForEach-Object { Write-Output $_ }
           if ($LASTEXITCODE -ne 0) {
             Write-Error "minikube image build failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
