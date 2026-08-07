@@ -41,7 +41,7 @@ spec:
           configMap:
             name: prometheus-config
         - name: rules
-          configmap:
+          configMap:
             name: prometheus-rules
 ---
 apiVersion: v1
