@@ -12,6 +12,6 @@ data:
         access: proxy
         # Standard Kubernetes DNS name for a Service:
         # <service>.<namespace>.svc.cluster.local
-        url: http://prometheus.github-actions.svc.cluster.local:9091
+        url: http://prometheus.github-actions.svc.cluster.local:9090
         isDefault: true
         editable: true
