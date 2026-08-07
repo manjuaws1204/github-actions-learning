@@ -54,12 +54,25 @@ jobs:
           minikube profile list
           kubectl config current-context
 
-      - name: Build image into minikube's image store
+      - name: Point Docker CLI at minikube's internal daemon, then build
+        # `minikube image build` has known flakiness in non-interactive
+        # sessions on Windows (it can exit fast with no output). This uses
+        # the older, much more battle-tested approach instead: point the
+        # regular `docker` CLI at minikube's own Docker daemon (the same
+        # thing `eval $(minikube docker-env)` does on Linux/macOS) and
+        # build with plain `docker build`. Both commands run in the SAME
+        # step/process, since the env vars docker-env sets only last for
+        # the process that set them.
         run: |
-          $output = minikube image build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} ./app 2>&1
-          $output | ForEach-Object { Write-Output $_ }
+          & minikube -p minikube docker-env --shell powershell | Invoke-Expression
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "minikube image build failed with exit code $LASTEXITCODE"
+            Write-Error "minikube docker-env failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+          docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} ./app
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "docker build failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
           }
 
