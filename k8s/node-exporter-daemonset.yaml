@@ -5,7 +5,7 @@ metadata:
   namespace: github-actions
 spec:
   selector:
-    matchlabels:
+    matchLabels:
       app: node-exporter
   template:
     metadata:
@@ -51,9 +51,9 @@ spec:
               readOnly: true
             - name: root
               mountPath: /host/root
-              readonly: true
+              readOnly: true
       volumes:
-        - name: procfs
+        - name: proc
           hostPath:
             path: /proc
         - name: sys
@@ -62,6 +62,3 @@ spec:
         - name: root
           hostPath:
             path: /
-        
-         
-      
