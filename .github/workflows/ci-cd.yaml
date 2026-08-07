@@ -92,6 +92,7 @@ jobs:
           kubectl apply -f k8s/prometheus-rbac.yaml
           kubectl apply -f k8s/prometheus-configmap.yaml
           kubectl apply -f k8s/prometheus-deployment.yaml
+          kubectl apply -f k8s/node-exporter-daemonset.yaml
 
       - name: Set image tag and deploy order-service
         # PowerShell's -replace instead of sed, since sed isn't available
