@@ -37,10 +37,6 @@ jobs:
   #    machine as minikube, because it builds the image straight into
   #    minikube's internal image store (no external registry needed
   #    for this local learning setup).
-  #
-  #    Set up the runner once with:
-  #      ./config.sh --labels minikube
-  #    on the machine where `minikube start` was run.
   # ---------------------------------------------------------------------
   build:
     needs: test
@@ -49,8 +45,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build image into minikube's image store
+        # Uses ${{ }} (GitHub's own substitution, resolved before the shell
+        # runs) instead of $VAR / ${VAR} so this works whether the runner's
+        # default shell is bash or PowerShell.
         run: |
-          minikube image build -t ${IMAGE_NAME}:${{ github.sha }} ./app
+          minikube image build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} ./app
 
   # ---------------------------------------------------------------------
   # 3. DEPLOY - also self-hosted, applies manifests and rolls out the
@@ -70,16 +69,16 @@ jobs:
           kubectl apply -f k8s/prometheus-deployment.yaml
 
       - name: Set image tag and deploy order-service
+        # PowerShell's -replace instead of sed, since sed isn't available
+        # on Windows by default.
         run: |
-          sed "s|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${{ github.sha }}|" \
-            k8s/deployment.yaml | kubectl apply -f -
+          (Get-Content k8s/deployment.yaml) -replace 'IMAGE_PLACEHOLDER', '${{ env.IMAGE_NAME }}:${{ github.sha }}' | kubectl apply -f -
           kubectl apply -f k8s/service.yaml
 
       - name: Wait for rollout to finish
         run: |
-          kubectl rollout status deployment/order-service \
-            -n ${NAMESPACE} --timeout=120s
+          kubectl rollout status deployment/order-service -n ${{ env.NAMESPACE }} --timeout=120s
 
       - name: Show running pods
         if: always()
-        run: kubectl get pods -n ${NAMESPACE} -o wide
+        run: kubectl get pods -n ${{ env.NAMESPACE }} -o wide
